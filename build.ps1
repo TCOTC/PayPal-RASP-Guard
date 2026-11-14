@@ -86,19 +86,20 @@ foreach ($d in @('classes', 'stub-classes', 'dex')) { New-Item -ItemType Directo
 
 # ------------------------------------------------------------- compile java ---
 Step 'compiling stubs (Xposed API surface)'
-$stubSrc = Get-ChildItem (Join-Path $root 'stubs') -Recurse -Filter *.java | Select-Object -ExpandProperty FullName
+$stubSrc = @(Get-ChildItem (Join-Path $root 'stubs') -Recurse -Filter *.java | Select-Object -ExpandProperty FullName)
 & $javac --release 11 -nowarn -d (Join-Path $build 'stub-classes') @stubSrc
 if ($LASTEXITCODE -ne 0) { Fail 'stub compilation failed' }
 
 Step 'compiling module source'
-$srcFiles = Get-ChildItem (Join-Path $app 'src') -Recurse -Filter *.java | Select-Object -ExpandProperty FullName
-& $javac --release 11 -nowarn -cp $androidJar -d (Join-Path $build 'classes') @srcFiles
+$srcFiles = @(Get-ChildItem (Join-Path $app 'src') -Recurse -Filter *.java | Select-Object -ExpandProperty FullName)
+$stubOut = Join-Path $build 'stub-classes'
+& $javac --release 11 -nowarn -cp "$androidJar;$stubOut" -d (Join-Path $build 'classes') @srcFiles
 if ($LASTEXITCODE -ne 0) { Fail 'module compilation failed' }
 
 # ------------------------------------------------------------------- dexing ---
 # 只把模块自身的类打进 dex；de.robv.* 由 LSPosed 在运行时提供，绝不能打包。
 Step 'dexing (module classes only)'
-$appClasses = Get-ChildItem (Join-Path $build 'classes') -Recurse -Filter *.class | Select-Object -ExpandProperty FullName
+$appClasses = @(Get-ChildItem (Join-Path $build 'classes') -Recurse -Filter *.class | Select-Object -ExpandProperty FullName)
 & $d8 --release --min-api 26 --lib $androidJar --output (Join-Path $build 'dex') @appClasses
 if ($LASTEXITCODE -ne 0) { Fail 'd8 failed' }
 
@@ -154,3 +155,5 @@ if ($Install) {
     if ($LASTEXITCODE -ne 0) { Fail 'adb install failed (device connected? same signing key as previous install?)' }
     Write-Host "Installed. Enable it in LSPosed (scope: PayPal) and force-stop the app." -ForegroundColor Yellow
 }
+
+
