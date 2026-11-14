@@ -1,0 +1,6 @@
+<resources>
+    <!-- 模块只在这些包里生效 -->
+    <string-array name="xposedscope">
+        <item>com.paypal.android.p2pmobile</item>
+    </string-array>
+</resources>
