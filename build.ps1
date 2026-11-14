@@ -26,7 +26,12 @@
 param(
     [switch]$Install,
     [string]$JdkHome,
-    [string]$SdkRoot
+    [string]$SdkRoot,
+    # Signing. Leave empty to use (or generate) keystore\debug.keystore.
+    [string]$Keystore,
+    [string]$KeystorePass = 'android',
+    [string]$KeyAlias = 'raspguard',
+    [string]$KeyPass = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -131,7 +136,13 @@ $aligned = Join-Path $build 'aligned.apk'
 & $zipalign -f 4 $unsigned $aligned
 if ($LASTEXITCODE -ne 0) { Fail 'zipalign failed' }
 
-$keystore = Join-Path $root 'keystore\debug.keystore'
+if ($Keystore) {
+    if (-not (Test-Path $Keystore)) { Fail "Keystore not found: $Keystore" }
+    $keystore = (Resolve-Path $Keystore).Path
+    Write-Host "using provided keystore: $keystore"
+} else {
+    $keystore = Join-Path $root 'keystore\debug.keystore'
+}
 if (-not (Test-Path $keystore)) {
     New-Item -ItemType Directory -Force -Path (Split-Path $keystore) | Out-Null
     & $keytool -genkeypair -keystore $keystore -alias raspguard -keyalg RSA -keysize 2048 `
@@ -140,11 +151,14 @@ if (-not (Test-Path $keystore)) {
 
 $version = ([xml](Get-Content (Join-Path $app 'AndroidManifest.xml'))).manifest.versionName
 $out = Join-Path $build "PayPal-RASP-Guard-$version.apk"
-& $apksigner sign --ks $keystore --ks-pass pass:android --key-pass pass:android --out $out $aligned
+if (-not $KeyPass) { $KeyPass = $KeystorePass }
+& $apksigner sign --ks $keystore --ks-pass "pass:$KeystorePass" --key-pass "pass:$KeyPass" --out $out $aligned
 if ($LASTEXITCODE -ne 0) { Fail 'apksigner failed' }
 
 & $apksigner verify --print-certs $out | Select-Object -First 3 | ForEach-Object { Write-Host "    $_" }
 
+$hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLower()
+"$hash  $(Split-Path $out -Leaf)" | Out-File -Encoding ascii "$out.sha256"
 $size = [math]::Round((Get-Item $out).Length / 1KB, 1)
 Write-Host ""
 Write-Host "OK  $out  ($size KB)" -ForegroundColor Green
@@ -155,5 +169,6 @@ if ($Install) {
     if ($LASTEXITCODE -ne 0) { Fail 'adb install failed (device connected? same signing key as previous install?)' }
     Write-Host "Installed. Enable it in LSPosed (scope: PayPal) and force-stop the app." -ForegroundColor Yellow
 }
+
 
 

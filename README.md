@@ -88,6 +88,40 @@ adb install -r build\PayPal-RASP-Guard-1.0.0.apk
 2. 确认作用域包含 `com.paypal.android.p2pmobile`（APK 内已声明 `xposedscope`，通常自动带上）
 3. 强制停止 PayPal，重新打开
 
+## 自动发布（GitHub Actions）
+
+`.github/workflows/release.yml`：推 `v*` tag 即自动构建并发布 Release，附 SHA-256 校验文件。
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+也可在 Actions 页面手动触发并填写版本号。
+
+**版本号由 tag 决定**：`v1.2.3` → `versionName=1.2.3`、`versionCode=10203`（`major*10000 + minor*100 + patch`）。工作流会改写 `app/AndroidManifest.xml`，仓库里的值只是本地默认，不必手动维护。tag 不符合 `vX.Y.Z` 会直接失败。
+
+### 配置签名密钥（强烈建议）
+
+不配置的话，CI 每次用临时生成的密钥签名，产物**无法覆盖升级**已安装的旧版本（LSPosed 也会把它当成另一个模块）。
+
+```powershell
+keytool -genkeypair -keystore release.keystore -alias raspguard `
+  -keyalg RSA -keysize 2048 -validity 3650
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | Set-Clipboard
+```
+
+在仓库 **Settings → Secrets and variables → Actions** 里添加：
+
+| Secret | 内容 |
+|---|---|
+| `KEYSTORE_BASE64` | 上一步复制出来的 base64 |
+| `KEYSTORE_PASS` | keystore 口令 |
+| `KEY_ALIAS` | `raspguard` |
+| `KEY_PASS` | key 口令（一般与 keystore 相同） |
+
+`release.keystore` 不要提交（`*.keystore` 已在 `.gitignore` 中）。**这把密钥要长期保管**：一旦丢失，此后发布的版本都无法覆盖升级旧安装。
+
 ## 验证是否生效
 
 LSPosed 日志（或 `adb shell su -c 'grep RASPGuard /data/adb/lspd/log/*'`）应出现：
