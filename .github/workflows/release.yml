@@ -50,7 +50,7 @@ jobs:
       # ------------------------------------------------------------- toolchain --
       # build.ps1 通过 JAVA_HOME 自动发现 JDK；runners 已自带 Android SDK。
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -173,3 +173,4 @@ jobs:
           } else {
             gh release create $tag @files --title $title --notes-file release-notes.md
           }
+
