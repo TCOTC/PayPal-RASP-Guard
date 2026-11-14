@@ -126,33 +126,16 @@ jobs:
       - name: Write release notes
         shell: pwsh
         run: |
-          $lines = @(
-            '### PayPal RASP Guard v' + $env:VERSION,
-            '',
-            '让 Google Play 版 PayPal 在已 root 的设备上正常启动：接管进程的未捕获异常处理器，'
-            '使 RASP 的自毁型异常被记录而不终止进程。不修改 attestation、不绕过服务端风控、不改 APK、不改系统分区。',
-            '',
-            '**安装**',
-            '',
-            '1. 需要已 root 设备 + LSPosed',
-            '2. `adb install -r ' + (Split-Path $env:APK_PATH -Leaf) + '`',
-            '3. LSPosed 中启用 **PayPal RASP Guard**，确认作用域包含 PayPal',
-            '4. 强制停止 PayPal 后重新打开',
-            '',
-            '**校验**',
-            '',
-            '```',
-            $env:SHA_LINE,
-            '```',
-            '',
-            '**注意**',
-            '',
-            '- 模块必须保持启用，禁用后应用恢复闪退',
-            '- 本组件关闭了目标应用的一项安全机制，可能降低账户欺诈防护能力',
-            '- 使用前请阅读 [DISCLAIMER.md](https://github.com/' + $env:GITHUB_REPOSITORY + '/blob/' + $env:GITHUB_REF_NAME + '/DISCLAIMER.md)',
-            '- 本项目与 PayPal Inc. 无任何关联'
-          )
-          Set-Content -Path release-notes.md -Value ($lines -join "`n") -Encoding utf8
+          # 模板单独放 .github/release-notes-template.md，脚本只做占位符替换。
+          # 教训：不要在 @( ) 里跨行用 '+' 拼接字符串 —— PowerShell 会把每个操作数
+          # 当成独立数组元素，把链接和代码块拆成多行（v1.0.0 的说明就是这么坏的）。
+          $notes = Get-Content .github/release-notes-template.md -Raw
+          $notes = $notes.Replace('__VERSION__', $env:VERSION)
+          $notes = $notes.Replace('__APK__', (Split-Path $env:APK_PATH -Leaf))
+          $notes = $notes.Replace('__SHA__', $env:SHA_LINE)
+          $notes = $notes.Replace('__REPO__', $env:GITHUB_REPOSITORY)
+          $notes = $notes.Replace('__REF__', $env:GITHUB_REF_NAME)
+          Set-Content -Path release-notes.md -Value $notes -NoNewline -Encoding utf8
           Write-Host '--- release-notes.md ---'
           Get-Content release-notes.md
 
